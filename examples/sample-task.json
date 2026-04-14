@@ -1,0 +1,14 @@
+{
+  "id": "task-demo1",
+  "title": "Add a /health endpoint to the API",
+  "description": "Add a GET /health endpoint that returns { \"status\": \"ok\", \"timestamp\": \"<ISO date>\" }. Follow existing route patterns in the project. Add a test if a test suite exists.",
+  "status": "pending",
+  "role": "coder",
+  "assigned_to": null,
+  "depends_on": [],
+  "acceptance": "GET /health returns 200 with JSON containing status and timestamp fields. Tests pass.",
+  "session_id": null,
+  "cost": null,
+  "created_at": "2026-01-01T00:00:00Z",
+  "completed_at": null
+}

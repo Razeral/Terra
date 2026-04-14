@@ -1,0 +1,41 @@
+# System / editor cruft
+.DS_Store
+.env
+node_modules/
+__pycache__/
+*.pyc
+
+# Logs and runtime state
+logs/*.log
+logs/*.pid
+logs/*.tmux
+logs/mayor-heartbeat
+logs/mayor-state.json
+logs/mayor-inbox.jsonl
+logs/mayor-outbox.jsonl
+logs/inbox-pending
+logs/inbox-reminded
+logs/janitor-report.json
+logs/watchdog-crash-count
+logs/watchdog-last-restart
+
+# Caches and scratch directories
+.playwright-mcp/
+.trash/
+tmp/
+
+# Worktrees are ephemeral — created and destroyed by spawn-agent.sh
+projects/worktrees/
+*/worktrees/
+
+# Projects under projects/ are independent repos with their own git history.
+# Terra orchestrates them but does not track their contents.
+# Add your projects here:
+# projects/my-app/
+
+# Transient task state — active tasks live in their worktrees
+tasks/active/
+
+# Root-level ad-hoc files
+/*.png
+/*.yml
