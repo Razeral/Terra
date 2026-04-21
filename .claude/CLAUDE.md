@@ -19,8 +19,14 @@ Read your task file at `.task.json` for your assignment.
 3. **Reuse first** — before writing new code, look for existing functions, modules, or patterns in the codebase that already solve part of the problem. Extend what's there rather than reinventing
 4. Implement the solution following existing conventions
 5. Write or update tests if the project has a test suite
-6. Verify your work compiles/passes linting
-7. Commit your changes with a conventional commit message
+6. **Verify your work — REQUIRED before marking done.** Produce `tests/<task-id>/` at the Terra repo root containing:
+   - `checklist.md` — filled-in verification checklist: what was tested, pass/fail per item, any caveats
+   - `build.log` — raw output of the project build (`npm run build`, `tsc -b`, `pytest --collect-only`, or equivalent)
+   - `unit-tests.log` — raw output of the project's test suite if one exists (`npx vitest run`, `pytest`, `go test`, etc.). Write `no test suite configured` if none exists.
+   - `playwright/` — **if your task touched UI**: Playwright smoke test output + screenshots of key states (at minimum the primary user flow you changed). Use the `mcp__playwright__*` tools. Save screenshots as `playwright/screenshots/<state>.png`.
+   - `summary.md` — 2–3 sentences for the reviewer: what you built, what you verified, any risks.
+   All files must be at the Terra repo root, not inside the project subdir — so they survive worktree merges. The reviewer task will fail your work if this directory is missing or incomplete.
+7. Commit your changes with a conventional commit message, INCLUDING the `tests/<task-id>/` files
 8. Update your task file: set `status` to `done` and `completed_at` to now
 
 ## Constraints

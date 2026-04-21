@@ -111,6 +111,7 @@ sync_and_merge() {
   # Run merge in subshell so failures don't kill the sub-mayor
   if (echo y | bash "$TERRA_ROOT/scripts/merge-work.sh" "$PROJECT" "$tid" 2>&1 | tee -a "$LOG"); then
     log "MERGED: $tid"
+    bash "$TERRA_ROOT/scripts/redesign-defer-hook.sh" "$tid" "$PROJECT" 2>&1 | tee -a "$LOG" || log "DEFER-HOOK-ERROR: $tid (continuing)"
   else
     log "MERGE-FAIL: $tid — attempting conflict resolution"
     # Try to resolve .task.json conflicts (most common) and complete the merge
@@ -146,6 +147,7 @@ sync_and_merge() {
         rm -f "$TERRA_ROOT/tasks/active/$tid.json"
       fi
       log "MERGED: $tid (after conflict resolution)"
+      bash "$TERRA_ROOT/scripts/redesign-defer-hook.sh" "$tid" "$PROJECT" 2>&1 | tee -a "$LOG" || log "DEFER-HOOK-ERROR: $tid (continuing)"
     else
       log "MERGE-FAIL: $tid — commit failed, marking as merge_conflict"
       git -C "$project_dir" merge --abort 2>/dev/null || true

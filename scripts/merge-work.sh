@@ -50,10 +50,43 @@ if [[ "$confirm" != [yY] ]]; then
   exit 0
 fi
 
+# Rebase agent branch onto latest main BEFORE merging.
+# Why: if Agent A's branch was created from main at time T, and Agent B merged
+# fixes into main between T and now, A's branch is "behind". A plain merge can
+# silently reapply A's older content on top of B's fix if A rewrote the file
+# wholesale (no conflict detected). Rebasing replays A's commits on top of
+# latest main, so any lost-fix case surfaces as an explicit rebase conflict
+# rather than a silently-reverted bugfix.
+#
+# Rebase happens inside the agent's worktree (the branch is checked out there).
+if [ -d "$WORKTREE_DIR" ]; then
+  echo "Rebasing $BRANCH onto $MAIN_BRANCH (prevents silent fix-loss)..."
+  if ! git -C "$WORKTREE_DIR" rebase "$MAIN_BRANCH" 2>&1; then
+    # Auto-resolve .task.json conflicts during rebase (agent state always wins)
+    if git -C "$WORKTREE_DIR" diff --name-only --diff-filter=U 2>/dev/null | grep -qx '.task.json'; then
+      echo "Rebase: auto-resolving .task.json with --theirs"
+      git -C "$WORKTREE_DIR" checkout --theirs .task.json
+      git -C "$WORKTREE_DIR" add .task.json
+      git -C "$WORKTREE_DIR" rebase --continue 2>&1 || {
+        git -C "$WORKTREE_DIR" rebase --abort 2>/dev/null || true
+        echo "Rebase aborted — falling through to direct merge (will surface conflicts for review)"
+      }
+    else
+      git -C "$WORKTREE_DIR" rebase --abort 2>/dev/null || true
+      echo "Rebase aborted due to conflicts — falling through to direct merge"
+      echo "Conflicted files visible via: git -C $WORKTREE_DIR status"
+    fi
+  else
+    echo "Rebase clean — merge will be fast-forward"
+  fi
+fi
+
 # Merge
+PRE_MERGE_SHA=$(git -C "$PROJECT_DIR" rev-parse "$MAIN_BRANCH")
 git -C "$PROJECT_DIR" checkout "$MAIN_BRANCH"
 if ! git -C "$PROJECT_DIR" merge "$BRANCH" --no-ff -m "feat: merge $TASK_ID work from agent"; then
-  # Auto-resolve .task.json conflicts by taking the branch (agent's) version
+  # Auto-resolve .task.json conflicts by taking the branch (agent's) version —
+  # agents always have the freshest task state. Same pattern as sub-mayor.sh.
   if git -C "$PROJECT_DIR" diff --name-only --diff-filter=U 2>/dev/null | grep -qx '.task.json'; then
     echo "Auto-resolving .task.json conflict with --theirs"
     git -C "$PROJECT_DIR" checkout --theirs .task.json
@@ -86,14 +119,15 @@ if [ -f "$TASK_FILE" ] && command -v jq &>/dev/null; then
   SESSION_ID=$(jq -r '.session_id // empty' "$TASK_FILE")
   if [ -n "$SESSION_ID" ]; then
     echo "Harvesting cost data for session $SESSION_ID..."
+    # Prefer global ccusage binary, fall back to npx
     if command -v ccusage &>/dev/null; then
       COST_JSON=$(ccusage session --id "$SESSION_ID" --json 2>/dev/null || echo "")
-    elif command -v npx &>/dev/null; then
-      COST_JSON=$(npx ccusage@latest session --id "$SESSION_ID" --json 2>/dev/null || echo "")
     else
-      COST_JSON=""
+      COST_JSON=$(npx ccusage@latest session --id "$SESSION_ID" --json 2>/dev/null || echo "")
     fi
     if [ -n "$COST_JSON" ]; then
+      # Extract cost metrics — try multiple field name conventions
+      # Token fields may be nested under .entries[] or flat at top level
       COST_DATA=$(echo "$COST_JSON" | jq '{
         total_cost_usd: (.totalCost // .total_cost_usd // 0),
         input_tokens: ([.entries[]?.inputTokens // 0] | add // 0),
@@ -101,6 +135,7 @@ if [ -f "$TASK_FILE" ] && command -v jq &>/dev/null; then
         cache_read_tokens: ([.entries[]?.cacheReadTokens // 0] | add // 0),
         cache_creation_tokens: ([.entries[]?.cacheCreationTokens // 0] | add // 0)
       }' 2>/dev/null || echo "")
+      # Remove zero-only token fields to avoid misleading data
       if [ -n "$COST_DATA" ]; then
         COST_DATA=$(echo "$COST_DATA" | jq 'with_entries(select(.key == "total_cost_usd" or .value != 0))' 2>/dev/null || echo "$COST_DATA")
         jq --argjson cost "$COST_DATA" '.cost = $cost' "$TASK_FILE" > "$TASK_FILE.tmp"
@@ -122,6 +157,23 @@ else
   # Fallback: move without cost data
   [ -f "$TERRA_ROOT/tasks/active/$TASK_ID.json" ] && \
     mv "$TERRA_ROOT/tasks/active/$TASK_ID.json" "$TERRA_ROOT/tasks/done/"
+fi
+
+# Auto-trigger BS dashboard rebuild if this merge touched build-solver/manifest.json
+if [ "$PROJECT" = "build-solver" ]; then
+  if git -C "$PROJECT_DIR" diff --name-only "$PRE_MERGE_SHA..HEAD" | grep -qx 'manifest.json'; then
+    echo ""
+    echo "=== manifest.json changed — rebuilding BS dashboard ==="
+    if [ -x "$TERRA_ROOT/scripts/deploy-bs-dashboard.sh" ]; then
+      if bash "$TERRA_ROOT/scripts/deploy-bs-dashboard.sh"; then
+        echo "Dashboard redeploy complete."
+      else
+        echo "WARNING: deploy-bs-dashboard.sh failed. Merge succeeded but dashboard is stale — run it manually."
+      fi
+    else
+      echo "WARNING: $TERRA_ROOT/scripts/deploy-bs-dashboard.sh not found or not executable."
+    fi
+  fi
 fi
 
 echo "Merge complete."

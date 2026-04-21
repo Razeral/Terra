@@ -94,6 +94,36 @@ for task_file in "$TERRA_ROOT"/tasks/active/*.json; do
   fi
 done
 
+# --- 1b. No-worktree stuck-done: --no-worktree agents that committed and exited
+#         but left task status=active (saw this with task-efp-mv — agent commits
+#         on master, tmux dies, but .task.json in tasks/active/ never updates). ---
+
+for task_file in "$TERRA_ROOT"/tasks/active/*.json; do
+  [ -f "$task_file" ] || continue
+  task_id=$(jq -r '.id' "$task_file")
+  tmux_session=$(jq -r '.tmux_session // empty' "$task_file")
+  assigned_to=$(jq -r '.assigned_to // empty' "$task_file")
+
+  # --no-worktree pattern: assigned_to == "in-place" in spawn-agent.sh
+  [ "$assigned_to" != "in-place" ] && continue
+  # Must be a dead session
+  [ -z "$tmux_session" ] && continue
+  tmux has-session -t "$tmux_session" 2>/dev/null && continue
+
+  # Look for a commit on the current branch of the Terra repo whose message
+  # references this task id. If found, the agent did its work — promote.
+  if git -C "$TERRA_ROOT" log --oneline -20 | grep -qE "(^|[^a-z])${task_id}([^a-z]|$)"; then
+    add_finding "stuck-done-inplace" "low" "$task_id" \
+      "In-place agent's tmux is dead and a commit referencing $task_id is on master — task stayed active" \
+      "auto-mark-done"
+    if [ "$FIX" = true ]; then
+      jq --arg ts "$NOW" '.status = "done" | .completed_at = $ts | .notes = ((.notes // "") + " [reconciled by janitor: in-place commit landed but status was stale]")' "$task_file" > "$task_file.tmp" \
+        && mv "$task_file.tmp" "$task_file" \
+        && mv "$task_file" "$TERRA_ROOT/tasks/done/"
+    fi
+  fi
+done
+
 # --- 2. Stale queue: pending tasks that have been sitting too long ---
 
 for task_file in "$TERRA_ROOT"/tasks/queue/*.json; do

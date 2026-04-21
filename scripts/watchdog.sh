@@ -31,7 +31,7 @@ CRASH_COOLDOWN_SEC=900  # 15 min — reset crash counter after this much uptime
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TELEGRAM_USER_ID="${TELEGRAM_USER_ID:-}"
 
-# Try loading from .env
+# Try loading from .env (optional)
 if [ -z "$TELEGRAM_BOT_TOKEN" ] && [ -f "$TERRA_ROOT/.env" ]; then
   TELEGRAM_BOT_TOKEN=$(grep '^TELEGRAM_BOT_TOKEN=' "$TERRA_ROOT/.env" 2>/dev/null | cut -d= -f2- || true)
   TELEGRAM_USER_ID=$(grep '^TELEGRAM_USER_ID=' "$TERRA_ROOT/.env" 2>/dev/null | cut -d= -f2- || true)

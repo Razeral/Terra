@@ -5,11 +5,10 @@
   <key>Label</key>
   <string>com.terra.watchdog</string>
 
-  <!-- UPDATE THESE PATHS to match your Terra installation -->
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/path/to/Terra/scripts/watchdog.sh</string>
+    <string>/Users/aip/Code/Terra/scripts/watchdog.sh</string>
   </array>
 
   <key>StartInterval</key>
@@ -19,10 +18,10 @@
   <true/>
 
   <key>StandardOutPath</key>
-  <string>/path/to/Terra/logs/watchdog-launchd.log</string>
+  <string>/Users/aip/Code/Terra/logs/watchdog-launchd.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/path/to/Terra/logs/watchdog-launchd.log</string>
+  <string>/Users/aip/Code/Terra/logs/watchdog-launchd.log</string>
 
   <key>EnvironmentVariables</key>
   <dict>

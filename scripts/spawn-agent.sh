@@ -173,6 +173,13 @@ echo "  Tools:     ${TOOLS:-default}"
 echo "  Log:       $LOG_FILE"
 echo ""
 
+# Launch in a tmux session
+# The agent runs interactively so you can attach and observe
+# --session-id ties the Claude Code session to our task for cost tracking via ccusage
+# Optional stream-json tracer (none by default)
+PIPE_CMD=""
+OUTPUT_FMT=""
+
 # Build cleanup command for no-worktree mode (restore original CLAUDE.md)
 CLEANUP_CMD=""
 if [ "$NO_WORKTREE" = true ]; then
@@ -184,15 +191,13 @@ if [ "$NO_WORKTREE" = true ]; then
   fi
 fi
 
-# Launch in a tmux session
-# The agent runs interactively so you can attach and observe
-# --session-id ties the Claude Code session to our task for cost tracking via ccusage
 tmux new-session -d -s "$TMUX_SESSION" -c "$WORKTREE_DIR" \
   "claude -p 'You are a worker agent. Read .claude/CLAUDE.md for your role and .task.json for your assignment. Execute the task.' \
   --session-id '$SESSION_UUID' \
   $MODEL_FLAG \
   $ALLOWED_TOOLS_FLAG \
-  2>&1 | tee '$LOG_FILE'; \
+  $OUTPUT_FMT \
+  2>&1 $PIPE_CMD | tee '$LOG_FILE'; \
   bash '$TERRA_ROOT/scripts/agent-complete-notify.sh' '$TASK_ID' '$PROJECT'; \
   bash '$TERRA_ROOT/scripts/merge-queue.sh' 2>&1 | tee -a '$LOG_FILE'; \
   $CLEANUP_CMD \

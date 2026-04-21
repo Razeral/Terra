@@ -187,6 +187,37 @@ tail -f logs/sub-mayor-feat.log
 
 `wikis/<project>/` stores persistent knowledge about each project (architecture, data models, conventions). Agents read these on startup instead of re-exploring the codebase. Update wikis after significant changes.
 
+### Verification
+
+Every coder task MUST produce `tests/<task-id>/` at the Terra repo root before marking `status: done`. This is enforced by the default `coder` and `coder-visual` roles and validated by reviewer tasks. Minimum contents:
+
+- `checklist.md` — filled verification checklist (build, tests, UI, integration, deploy-readiness)
+- `build.log` — raw build output
+- `unit-tests.log` — raw test suite output (or `no test suite configured`)
+- `playwright/` — screenshots + session notes for any UI work (uses Playwright MCP tools)
+- `summary.md` — 2–3 sentences for the reviewer
+
+See `tests/README.md` for templates. This artefact layer:
+- Catches "done but not really done" tasks at merge time
+- Gives reviewers evidence they can skim in seconds
+- Lives at the repo root so artefacts survive sub-mayor auto-merges (which squash worktree contents)
+
+### Merge safety (rebase-before-merge)
+
+`merge-work.sh` rebases the agent's branch onto the latest main before merging. This surfaces the "Agent B branched before Agent A's fix merged, B rewrites the same file" class of bug as an explicit conflict instead of silently reverting A's fix. If the rebase is clean, the merge is a fast-forward with zero possibility of lost work. `.task.json` conflicts auto-resolve with `--theirs` (agent state always wins).
+
+### Stuck-task reconciliation
+
+`run-janitor.sh --fix` detects and repairs several drift classes:
+
+- **Dead agents with no commits** — auto-marked `failed`
+- **Empty orphaned worktrees** — auto-removed
+- **In-place (`--no-worktree`) stuck-done** — if a task is still `active` but a matching commit landed on main and the tmux session is dead, auto-promoted to `done`
+- **Orphaned tmux logs** — auto-deleted
+- Stale queue entries and dead-agents-with-commits are flagged (medium severity) for human review
+
+Run it on a cron (5–30 min) or on Mayor startup.
+
 ## Scripts Reference
 
 | Script | Purpose |
@@ -194,9 +225,9 @@ tail -f logs/sub-mayor-feat.log
 | `spawn-agent.sh` | Create worktree + launch agent in tmux |
 | `sub-mayor.sh` | Autonomous pipeline orchestrator |
 | `check-agents.sh` | Dashboard: status, cost, logs |
-| `merge-work.sh` | Merge agent branch + harvest cost |
+| `merge-work.sh` | Rebase agent branch onto main → merge → harvest cost |
 | `merge-queue.sh` | Auto-merge all clean done tasks |
-| `run-janitor.sh` | Detect stale tasks, dead agents, orphaned worktrees |
+| `run-janitor.sh` | Detect and (with `--fix`) repair stale tasks, dead agents, orphaned worktrees, stuck-done `--no-worktree` tasks |
 | `list-tasks.sh` | Task board (queue/active/done) |
 | `cost-report.sh` | Cost aggregation by task/role/model |
 | `start-mayor.sh` | Launch Mayor in tmux |
